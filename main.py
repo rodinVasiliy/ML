@@ -5,23 +5,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def convert_data(source, column_name):
+    source[column_name] = source[column_name].str.replace(',', '')
+    source[column_name] = pd.to_numeric(source[column_name])
+
+
+def get_anomalies(source, column_name, threshold):
+    arr = source.loc[:, column_name].rolling(window=9).median()
+    size = len(arr)
+    indexes = []
+    vals = []
+    for i in range(1, size):
+        if (arr[i] / arr[i - 1]) > threshold or arr[i - 1] / arr[i] > threshold:
+            indexes.append(i)
+            vals.append(arr[i])
+
+    tmp = source.loc[:, column_name].rolling(window=9).median().plot(figsize=[20, 5])
+    plt.plot(indexes, [arr[i] for i in indexes], ls="", marker="o", label="points")
+    print(indexes)
+
+    plt.show()
+
 
 if __name__ == '__main__':
     path = os.path.join('resources', 'bitcoin.csv')
     source_df = pd.read_csv(path, sep=',')
-    arr_1 = source_df.loc[:, 'Open'].rolling(window=9).median()
-    arr_2 = source_df.loc[:, 'Open'].rolling(window=9).mean()
-    dif = arr_2 - arr_1
-    size = len(dif)
-    indexes = []
-    vals = []
-    for i in range(0, size):
-        if dif[i] > 200 or dif[i] < -200:
-            indexes.append(i)
-            vals.append(arr_1[i])
+    get_anomalies(source_df, 'Open')
+    get_anomalies(source_df, 'High')
+    get_anomalies(source_df, 'Low')
+    get_anomalies(source_df, 'Close')
 
-    tmp = source_df.loc[:, 'Open'].rolling(window=9).median().plot(figsize = [20,5])
-    plt.plot(indexes, [arr_1[i] for i in indexes], ls="", marker="o", label="points")
-    print(indexes)
-
-    plt.show()
+    convert_data(source_df, 'Volume')
+    # convert_data(source_df, 'Market Cap')
+    source_df.loc[source_df['Market Cap'] == '-', :] = np.nan
+    convert_data(source_df, 'Market Cap')
+    source_df['Market Cap'].interpolate(limit=10, limit_direction='forward', method='pad')
+    get_anomalies(source_df, 'Volume')
+    get_anomalies(source_df, 'Market Cap')
